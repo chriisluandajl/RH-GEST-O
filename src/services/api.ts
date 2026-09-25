@@ -286,6 +286,26 @@ export const api = {
       body: JSON.stringify(backupData),
     }),
 
+  // Local Server & Network
+  getLocalServerInfo: () =>
+    fetchJSON<{
+      port: number;
+      hostname: string;
+      platform: string;
+      localIpAddresses: string[];
+      databaseFile: string;
+      databaseSizeBytes: number;
+      databaseLastModified: string;
+      counts: {
+        employees: number;
+        contracts: number;
+        documents: number;
+        payrollSheets: number;
+        users: number;
+        auditLogs: number;
+      };
+    }>('/system/local-server-info'),
+
   // Search
   globalSearch: (query: string) =>
     fetchJSON<{

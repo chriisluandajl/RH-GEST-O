@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import apiRoutes from './server/routes.ts';
@@ -43,7 +44,33 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`GESTÃO EMPRESARIAL RH server running on http://0.0.0.0:${PORT}`);
+    const nets = os.networkInterfaces();
+    const addresses: string[] = [];
+    for (const name of Object.keys(nets)) {
+      const netList = nets[name];
+      if (netList) {
+        for (const net of netList) {
+          if (net.family === 'IPv4' && !net.internal) {
+            addresses.push(net.address);
+          }
+        }
+      }
+    }
+
+    console.log(`\n===============================================================`);
+    console.log(`🚀 SISTEMA GESTÃO RH EMPRESARIAL - SERVIDOR LOCAL ONLINE`);
+    console.log(`===============================================================`);
+    console.log(`📍 Acesso neste PC:`);
+    console.log(`   http://localhost:${PORT}`);
+    if (addresses.length > 0) {
+      console.log(`\n🌐 Acesso em outros computadores/celulares na mesma rede local:`);
+      addresses.forEach((addr) => {
+        console.log(`   http://${addr}:${PORT}`);
+      });
+    }
+    console.log(`\n💾 Base de Dados Permanente: data/database.json`);
+    console.log(`✅ Todos os computadores salvam e sincronizam no mesmo banco de dados!`);
+    console.log(`===============================================================\n`);
   });
 }
 

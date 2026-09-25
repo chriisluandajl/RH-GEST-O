@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'pedrao141414@gmail.com'
+      );
+    }
+
+    // Test connection document for startup validation
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Company Settings
+    match /company_settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isBootstrappedAdmin();
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isBootstrappedAdmin() || (isSignedIn() && request.auth.uid == userId);
+    }
+
+    // Employees
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+    }
+
+    // Contracts
+    match /contracts/{contractId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+    }
+
+    // Documents
+    match /documents/{documentId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+    }
+
+    // Payroll Sheets
+    match /payroll_sheets/{sheetId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+    }
+  }
+}

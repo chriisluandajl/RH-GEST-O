@@ -1,0 +1,125 @@
+{
+  "entities": {
+    "CompanySettings": {
+      "title": "CompanySettings",
+      "description": "Company configuration and metadata",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string", "maxLength": 200 },
+        "tradeName": { "type": "string", "maxLength": 200 },
+        "nif": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "address": { "type": "string", "maxLength": 300 },
+        "city": { "type": "string", "maxLength": 100 },
+        "province": { "type": "string", "maxLength": 100 },
+        "logoUrl": { "type": "string", "maxLength": 500000 },
+        "website": { "type": "string", "maxLength": 200 }
+      },
+      "required": ["companyName", "nif"]
+    },
+    "User": {
+      "title": "User",
+      "description": "System user account",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 200 },
+        "email": { "type": "string", "maxLength": 200 },
+        "role": { "type": "string", "maxLength": 50 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 100 }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Company employee record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 50 },
+        "fullName": { "type": "string", "maxLength": 250 },
+        "email": { "type": "string", "maxLength": 200 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "idNumber": { "type": "string", "maxLength": 50 },
+        "nif": { "type": "string", "maxLength": 50 },
+        "departmentName": { "type": "string", "maxLength": 100 },
+        "positionName": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "maxLength": 50 },
+        "baseSalary": { "type": "number" },
+        "admissionDate": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "code", "fullName", "idNumber"]
+    },
+    "Contract": {
+      "title": "Contract",
+      "description": "Employment contract",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "contractNumber": { "type": "string", "maxLength": 100 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "employeeName": { "type": "string", "maxLength": 250 },
+        "type": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "maxLength": 50 },
+        "startDate": { "type": "string", "maxLength": 50 },
+        "baseSalary": { "type": "number" }
+      },
+      "required": ["id", "contractNumber", "employeeId", "type", "startDate"]
+    },
+    "Document": {
+      "title": "Document",
+      "description": "Stored archive document",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 250 },
+        "fileName": { "type": "string", "maxLength": 250 },
+        "category": { "type": "string", "maxLength": 100 },
+        "employeeId": { "type": "string", "maxLength": 128 },
+        "uploadDate": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "category"]
+    },
+    "PayrollSheet": {
+      "title": "PayrollSheet",
+      "description": "Monthly payroll sheet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "referenceMonth": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "maxLength": 50 },
+        "totalGross": { "type": "number" },
+        "totalNet": { "type": "number" }
+      },
+      "required": ["id", "referenceMonth", "status"]
+    }
+  },
+  "firestore": {
+    "/company_settings/{settingId}": {
+      "schema": "CompanySettings",
+      "description": "Stores company global configuration"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Stores authorized system users"
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Stores employee profiles"
+    },
+    "/contracts/{contractId}": {
+      "schema": "Contract",
+      "description": "Stores employee contracts"
+    },
+    "/documents/{documentId}": {
+      "schema": "Document",
+      "description": "Stores document records"
+    },
+    "/payroll_sheets/{sheetId}": {
+      "schema": "PayrollSheet",
+      "description": "Stores monthly payroll records"
+    }
+  }
+}

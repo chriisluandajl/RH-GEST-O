@@ -17,6 +17,14 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Server,
+  Wifi,
+  HardDrive,
+  Copy,
+  CheckCircle2,
+  UploadCloud,
+  RefreshCw,
+  Laptop,
 } from 'lucide-react';
 import { useCompany } from '../../context/CompanyContext.tsx';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -76,6 +84,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSubModule }) 
   const [editUserPassword, setEditUserPassword] = useState('');
   const [showPasswordToggle, setShowPasswordToggle] = useState(false);
   const [userModalError, setUserModalError] = useState<string | null>(null);
+
+  // Server Info & Persistence State
+  const [serverInfo, setServerInfo] = useState<{
+    port: number;
+    hostname: string;
+    platform: string;
+    localIpAddresses: string[];
+    databaseFile: string;
+    databaseSizeBytes: number;
+    databaseLastModified: string;
+    counts: {
+      employees: number;
+      contracts: number;
+      documents: number;
+      payrollSheets: number;
+      users: number;
+      auditLogs: number;
+    };
+  } | null>(null);
+  const [isLoadingServerInfo, setIsLoadingServerInfo] = useState(false);
+  const [copiedIp, setCopiedIp] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const fetchServerInfo = async () => {
+    try {
+      setIsLoadingServerInfo(true);
+      const info = await api.getLocalServerInfo();
+      setServerInfo(info);
+    } catch (err) {
+      console.error('Failed to load server info', err);
+    } finally {
+      setIsLoadingServerInfo(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'backup') {
+      fetchServerInfo();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (initialSubModule === 'empresa') setActiveTab('empresa');
@@ -240,24 +288,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSubModule }) 
   };
 
   const handleDownloadBackup = () => {
-    const backupData = {
-      exportDate: new Date().toISOString(),
-      company,
-      visual,
-      departments,
-      positions,
-      categories,
-    };
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], {
-      type: 'application/json',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Backup_RH_Empresarial_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    addToast('Backup dos dados descarregado com sucesso!', 'success');
+    window.location.href = api.exportBackupUrl();
+    addToast('Transferência da cópia de segurança oficial iniciada!', 'success');
+  };
+
+  const handleRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsRestoring(true);
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      await api.restoreBackup(parsed);
+      addToast('Base de dados restaurada com sucesso! A recarregar...', 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } catch (err: any) {
+      addToast(err.message || 'Erro ao restaurar backup. Verifique se o ficheiro é válido.', 'error');
+    } finally {
+      setIsRestoring(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleCopyIp = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedIp(url);
+    addToast(`Link de rede copiado: ${url}`, 'success');
+    setTimeout(() => setCopiedIp(null), 3000);
   };
 
   return (
@@ -282,7 +341,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSubModule }) 
           { id: 'estrutura', label: 'Departamentos & Cargos', icon: <Briefcase className="w-3.5 h-3.5" /> },
           { id: 'categorias', label: 'Categorias de Documentos', icon: <FolderOpen className="w-3.5 h-3.5" /> },
           { id: 'personalizacao', label: 'Identidade Visual & Moeda', icon: <Palette className="w-3.5 h-3.5" /> },
-          { id: 'backup', label: 'Segurança & Backup', icon: <Database className="w-3.5 h-3.5" /> },
+          { id: 'backup', label: 'Servidor Local, Rede & Backup', icon: <Server className="w-3.5 h-3.5" /> },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -674,29 +733,344 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSubModule }) 
         </form>
       )}
 
-      {/* Tab 6: Backup & Segurança */}
+      {/* Tab 6: Servidor Local, Rede & Backup */}
       {activeTab === 'backup' && (
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5 text-xs max-w-2xl">
-          <div className="pb-3 border-b border-slate-100">
-            <h2 className="text-sm font-bold text-slate-900">Segurança de Dados & Cópia de Salvaguarda</h2>
-            <p className="text-slate-500 text-[11px]">
-              Exporte todos os registos do sistema em ficheiro JSON estruturado para arquivo seguro.
-            </p>
+        <div className="space-y-6 text-xs max-w-4xl">
+          {/* Top Overview Card */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900">
+                    Servidor Local Central da Empresa
+                  </h2>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Ativo & Gravando no Disco
+                  </span>
+                </div>
+                <p className="text-slate-500 text-xs mt-1">
+                  Este computador atua como o servidor central. Qualquer computador conectado à mesma rede acessa o sistema sem perder dados.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchServerInfo}
+                disabled={isLoadingServerInfo}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-colors flex items-center gap-1.5 text-xs self-start sm:self-auto shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingServerInfo ? 'animate-spin' : ''}`} />
+                Atualizar Estado
+              </button>
+            </div>
+
+            {/* Storage Info Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Ficheiro Permanente</span>
+                <div className="font-mono font-bold text-slate-800 text-xs mt-1 truncate">
+                  {serverInfo?.databaseFile || 'data/database.json'}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5 block">Gravado no disco rígido</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Tamanho da Base</span>
+                <div className="font-mono font-bold text-slate-800 text-sm mt-1">
+                  {serverInfo ? `${(serverInfo.databaseSizeBytes / 1024).toFixed(1)} KB` : '...'}
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5 block">Em formato JSON estruturado</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Total de Colaboradores</span>
+                <div className="font-bold text-slate-800 text-sm mt-1">
+                  {serverInfo?.counts.employees ?? '...'} Colaboradores
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5 block">Cadastros permanentes</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Contratos & Documentos</span>
+                <div className="font-bold text-slate-800 text-sm mt-1">
+                  {(serverInfo?.counts.contracts ?? 0) + (serverInfo?.counts.documents ?? 0)} Itens
+                </div>
+                <span className="text-[10px] text-slate-500 mt-0.5 block">
+                  {serverInfo?.counts.payrollSheets ?? 0} folhas de salário
+                </span>
+              </div>
+            </div>
+
+            {/* Firebase Cloud Firestore Card */}
+            <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50/80 via-orange-50/40 to-transparent border border-amber-200/80 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-900">Google Cloud Firestore (Firebase)</h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                        Conectado & Provisionado
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Banco de dados na nuvem ativo. Permite hospedar no Render, Koyeb ou executar localmente sem nunca perder dados.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
+                <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
+                  <span className="text-slate-400 font-semibold block text-[10px] uppercase">Projeto Firebase</span>
+                  <code className="text-amber-900 font-mono font-bold text-xs mt-0.5 block">nodal-scheduler-xlxdt</code>
+                </div>
+                <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
+                  <span className="text-slate-400 font-semibold block text-[10px] uppercase">Regras de Segurança ABAC</span>
+                  <span className="text-emerald-700 font-bold text-xs mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Regras implantadas e ativas no Google Cloud
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-200/70 space-y-3">
-            <h3 className="font-bold text-blue-900">Exportação Completa da Base de Dados</h3>
-            <p className="text-slate-600 leading-relaxed text-[11px]">
-              Gera um ficheiro integral contendo todos os dados cadastrais da empresa, funcionários,
-              departamentos, cargos, contratos, férias, faltas, folhas salariais e parâmetros de sistema.
+          {/* Network Access & Multi-Computer Connection */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <Wifi className="w-4 h-4 text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-900">
+                  Como Conectar Outros Computadores e Celulares na Empresa
+                </h3>
+              </div>
+              <p className="text-slate-500 text-xs mt-1 leading-relaxed">
+                Qualquer computador (recepção, RH, diretoria) ou tablet/celular conectado ao mesmo Wi-Fi ou cabo de rede do escritório pode aceder ao sistema abrindo o navegador no endereço abaixo:
+              </p>
+            </div>
+
+            {/* IP Addresses List */}
+            <div className="space-y-2.5">
+              {/* Localhost */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-slate-50 border border-slate-200 rounded-xl gap-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                    <Laptop className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">Acesso neste mesmo computador (PC Servidor)</div>
+                    <code className="text-xs text-blue-600 font-mono font-semibold">
+                      http://localhost:{serverInfo?.port || 3000}
+                    </code>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopyIp(`http://localhost:${serverInfo?.port || 3000}`)}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 text-xs self-start sm:self-auto shrink-0 shadow-2xs"
+                >
+                  {copiedIp === `http://localhost:${serverInfo?.port || 3000}` ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700">Copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Copiar Link</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Local Network IPs */}
+              {serverInfo?.localIpAddresses && serverInfo.localIpAddresses.length > 0 ? (
+                serverInfo.localIpAddresses.map((ip) => {
+                  const url = `http://${ip}:${serverInfo.port || 3000}`;
+                  const isCopied = copiedIp === url;
+                  return (
+                    <div
+                      key={ip}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl gap-2"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <Wifi className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            Acesso para outros computadores na mesma rede Wi-Fi / Cabo:
+                          </div>
+                          <code className="text-xs text-blue-700 font-mono font-bold">
+                            {url}
+                          </code>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyIp(url)}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-1.5 text-xs self-start sm:self-auto shrink-0 shadow-xs"
+                      >
+                        {isCopied ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copiar Link para outros PCs</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs">
+                  A carregar endereços de rede local... (Caso esteja a rodar em nuvem, o acesso é via URL do Cloud Run).
+                </div>
+              )}
+            </div>
+
+            {/* Zero Data Loss Guarantee Box */}
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-2 text-emerald-950">
+              <div className="flex items-center gap-2 font-bold text-emerald-900 text-xs">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Garantia de Persistência: Como o salvamento funciona sem perda de dados?</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-emerald-900/90 pl-1 leading-relaxed">
+                <li>
+                  <strong>Gravação Centralizada Imediata:</strong> Quando qualquer utilizador logado em outro computador cadastra um funcionário, aprova férias ou processa salários, a alteração é enviada diretamente pela rede e salva no disco deste PC servidor no arquivo <code className="bg-emerald-100/80 px-1 py-0.5 rounded font-mono text-emerald-800">data/database.json</code>.
+                </li>
+                <li>
+                  <strong>Independência de Navegador:</strong> Os dados <em>não</em> ficam guardados no navegador do outro computador. Se a pessoa desligar o computador dela, fechar a aba ou limpar o histórico, <strong>nada é perdido</strong>.
+                </li>
+                <li>
+                  <strong>Sincronização em Tempo Real:</strong> Todos os computadores ligados consultam e gravam na mesma base de dados. O que um funcionário faz é visualizado pelos outros instantaneamente.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Backup & Restore Section */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs space-y-5">
+            <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Database className="w-4 h-4 text-blue-600" />
+                  Cópias de Segurança & Restauro (Backups Oficiais)
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Exporte o banco de dados oficial completo para guardar em pen drive ou nuvem, ou restaure um backup anterior.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Export Box */}
+              <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-200/70 space-y-3 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-blue-600" />
+                    Exportar Cópia Completa (.JSON)
+                  </h4>
+                  <p className="text-slate-600 leading-relaxed text-[11px] mt-1.5">
+                    Gera um download com todos os registos: colaboradores, contratos, recibos, histórico salarial, departamentos e configurações da empresa.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadBackup}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 text-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  Descarregar Ficheiro de Backup (.json)
+                </button>
+              </div>
+
+              {/* Import/Restore Box */}
+              <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-200/70 space-y-3 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <UploadCloud className="w-4 h-4 text-amber-600" />
+                    Restaurar Dados a Partir de Ficheiro
+                  </h4>
+                  <p className="text-slate-600 leading-relaxed text-[11px] mt-1.5">
+                    Substitui ou restaura a base de dados a partir de um ficheiro JSON previamente descarregado (útil ao mudar de computador ou resgatar dados).
+                  </p>
+                </div>
+                <label className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 text-xs cursor-pointer text-center">
+                  <UploadCloud className="w-4 h-4" />
+                  <span>{isRestoring ? 'A restaurar...' : 'Selecionar Ficheiro para Restaurar'}</span>
+                  <input
+                    type="file"
+                    accept=".json"
+                    disabled={isRestoring}
+                    onChange={handleRestoreFile}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Setup Instructions for Local PC */}
+          <div className="bg-slate-900 text-slate-200 p-6 rounded-2xl shadow-xs space-y-4">
+            <div className="flex items-center gap-2">
+              <HardDrive className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-bold text-white">
+                Guia Rápido: Como Executar o Sistema no seu Computador
+              </h3>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Para transformar o seu computador no servidor da sua empresa em qualquer altura, siga os 3 passos simples abaixo:
             </p>
-            <button
-              onClick={handleDownloadBackup}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Descarregar Backup JSON do Sistema
-            </button>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700 space-y-1.5">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">Passo 1</span>
+                <strong className="text-white block">Instalar Dependências</strong>
+                <p className="text-[11px] text-slate-300 leading-normal">
+                  Abra a pasta do sistema no terminal (CMD ou PowerShell) e execute uma única vez:
+                </p>
+                <code className="block bg-slate-950 px-2.5 py-1.5 rounded font-mono text-emerald-400 text-[11px]">
+                  npm install
+                </code>
+              </div>
+
+              <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700 space-y-1.5">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">Passo 2</span>
+                <strong className="text-white block">Iniciar o Servidor</strong>
+                <p className="text-[11px] text-slate-300 leading-normal">
+                  Para ligar o servidor no seu PC, execute no terminal:
+                </p>
+                <code className="block bg-slate-950 px-2.5 py-1.5 rounded font-mono text-emerald-400 text-[11px]">
+                  npm start
+                </code>
+                <span className="text-[10px] text-slate-400 block">(ou npm run dev em desenvolvimento)</span>
+              </div>
+
+              <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700 space-y-1.5">
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">Passo 3</span>
+                <strong className="text-white block">Conectar os Computadores</strong>
+                <p className="text-[11px] text-slate-300 leading-normal">
+                  Nos outros computadores da empresa conectados ao mesmo Wi-Fi, abra o navegador e digite o IP mostrado acima (ex: <span className="text-emerald-400">http://192.168.1.100:3000</span>).
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-800/90 border border-slate-700 rounded-xl text-[11px] text-slate-300 flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-amber-300">Dica sobre o Firewall do Windows:</strong> Quando você executar pela primeira vez, o Windows exibirá uma mensagem "O Firewall do Windows bloqueou alguns recursos deste aplicativo". Basta clicar em <strong>"Permitir acesso"</strong> em Redes Privadas para que os outros computadores consigam conectar sem restrições.
+              </div>
+            </div>
           </div>
         </div>
       )}

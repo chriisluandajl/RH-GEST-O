@@ -1,4 +1,7 @@
 import express, { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { db } from './db.ts';
 import {
   Employee,
@@ -1929,6 +1932,56 @@ router.get('/search', (req: Request, res: Response) => {
     contracts: contracts.slice(0, 8),
     documents: documents.slice(0, 8),
     departments: departments.slice(0, 5),
+  });
+});
+
+// ----------------------------------------------------
+// LOCAL SERVER & NETWORK INFO
+// ----------------------------------------------------
+router.get('/system/local-server-info', (_req: Request, res: Response) => {
+  const nets = os.networkInterfaces();
+  const addresses: string[] = [];
+
+  for (const name of Object.keys(nets)) {
+    const netList = nets[name];
+    if (netList) {
+      for (const net of netList) {
+        if (net.family === 'IPv4' && !net.internal) {
+          addresses.push(net.address);
+        }
+      }
+    }
+  }
+
+  const dbFilePath = path.join(process.cwd(), 'data', 'database.json');
+  let dbSize = 0;
+  let lastModified = new Date().toISOString();
+  if (fs.existsSync(dbFilePath)) {
+    try {
+      const stats = fs.statSync(dbFilePath);
+      dbSize = stats.size;
+      lastModified = stats.mtime.toISOString();
+    } catch {
+      // fallback
+    }
+  }
+
+  res.json({
+    port: 3000,
+    hostname: os.hostname(),
+    platform: os.platform(),
+    localIpAddresses: addresses,
+    databaseFile: 'data/database.json',
+    databaseSizeBytes: dbSize,
+    databaseLastModified: lastModified,
+    counts: {
+      employees: db.getEmployees().length,
+      contracts: db.getContracts().length,
+      documents: db.getDocuments().length,
+      payrollSheets: db.getPayrollSheets().length,
+      users: db.getUsers().length,
+      auditLogs: db.getAuditLogs().length,
+    },
   });
 });
 
