@@ -1,0 +1,6 @@
+{
+  "name": "Gestão Empresarial RH",
+  "description": "Sistema empresarial completo para gestão administrativa de funcionários, contratos de trabalho, arquivo digital documental, férias, faltas e folha salarial.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
