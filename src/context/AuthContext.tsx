@@ -27,8 +27,15 @@ interface AuthContextType {
   addToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
   switchUser: (userId: string) => void;
-  loginAsEmployee: (identifier: string) => Promise<void>;
+  loginAsEmployee: (identifier: string, password?: string) => Promise<void>;
   loginAsAdmin: (email: string, password?: string) => Promise<void>;
+  updateUserProfile: (data: {
+    name?: string;
+    email?: string;
+    avatar?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => Promise<void>;
   hasPermission: (permission: keyof RolePermissions['permissions'] | string) => boolean;
   refreshUsers: () => Promise<void>;
   logout: () => void;
@@ -125,9 +132,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginAsEmployee = async (identifier: string) => {
+  const loginAsEmployee = async (identifier: string, password?: string) => {
     try {
-      const res = await api.employeeLogin(identifier);
+      const res = await api.employeeLogin(identifier, password);
       if (res.user) {
         setUser(res.user);
         localStorage.setItem('gestao_rh_user_id', res.user.id);
@@ -150,9 +157,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           e.idNumber.toLowerCase() === clean ||
           (e.nif && e.nif.toLowerCase() === clean) ||
           e.id.toLowerCase() === clean ||
-          e.email.toLowerCase() === clean
+          e.email.toLowerCase() === clean ||
+          e.fullName.toLowerCase() === clean ||
+          e.fullName.toLowerCase().includes(clean)
       );
       if (emp) {
+        const cleanPass = (password || '').trim();
+        if (!cleanPass) {
+          throw new Error(`A palavra-passe é obrigatória. A sua senha padrão inicial é o seu Código de Funcionário (${emp.code}).`);
+        }
+
         const fallbackUser: User = {
           id: `usr-emp-${emp.id}`,
           name: emp.fullName,
@@ -167,16 +181,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           active: true,
           createdAt: new Date().toISOString(),
         };
-        setUser(fallbackUser);
+
+        const existingUser = users.find((u) => u.employeeId === emp.id || u.email.toLowerCase() === emp.email.toLowerCase());
+        const expected = existingUser?.password || emp.password;
+        let valid = false;
+        if (expected) {
+          valid = cleanPass === expected || cleanPass.toLowerCase() === expected.toLowerCase() || cleanPass.toLowerCase() === emp.code.toLowerCase();
+        } else {
+          valid = cleanPass.toLowerCase() === emp.code.toLowerCase() || cleanPass.toLowerCase() === emp.idNumber.toLowerCase();
+        }
+
+        if (!valid) {
+          throw new Error(`Palavra-passe incorreta. A sua senha inicial é o seu Código do Sistema (${emp.code}) ou a senha alterada no seu perfil.`);
+        }
+
+        const activeUser = existingUser || fallbackUser;
+        setUser(activeUser);
         setCurrentEmployee(emp);
-        localStorage.setItem('gestao_rh_user_id', fallbackUser.id);
+        localStorage.setItem('gestao_rh_user_id', activeUser.id);
         sessionStorage.setItem('gestao_rh_session_unlocked', 'true');
         setIsLocked(false);
         setIsLoginModalOpen(false);
         addToast(`Acesso desbloqueado: ${emp.fullName} (Portal do Colaborador)`, 'success');
         return;
       }
-      throw new Error(`Nenhum colaborador encontrado com o BI ou Código "${identifier}". Verifique os dados com o RH.`);
+      throw new Error(err.message || `Nenhum colaborador encontrado com os dados informados ("${identifier}"). Verifique os dados com o RH.`);
     }
   };
 
@@ -261,6 +290,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserProfile = async (data: {
+    name?: string;
+    email?: string;
+    avatar?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => {
+    try {
+      const res = await api.updateProfile(data);
+      if (res.user) {
+        setUser(res.user);
+        setUsers((prev) => prev.map((u) => (u.id === res.user.id ? res.user : u)));
+        if (data.avatar && res.user.employeeId) {
+          setEmployeesList((prev) =>
+            prev.map((e) => (e.id === res.user.employeeId ? { ...e, photoUrl: data.avatar } : e))
+          );
+          if (currentEmployee?.id === res.user.employeeId) {
+            setCurrentEmployee((prev) => (prev ? { ...prev, photoUrl: data.avatar } : null));
+          }
+        }
+        addToast('Perfil atualizado com sucesso!', 'success');
+        refreshUsers();
+        return;
+      }
+    } catch (err: any) {
+      console.warn('Backend updateProfile failed, updating local state:', err);
+      if (user) {
+        const updated: User = {
+          ...user,
+          name: data.name?.trim() || user.name,
+          email: data.email?.trim() || user.email,
+          avatar: data.avatar || user.avatar,
+          password: data.newPassword?.trim() || user.password,
+        };
+        setUser(updated);
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+        if (data.avatar && user.employeeId) {
+          setEmployeesList((prev) =>
+            prev.map((e) => (e.id === user.employeeId ? { ...e, photoUrl: data.avatar } : e))
+          );
+          if (currentEmployee?.id === user.employeeId) {
+            setCurrentEmployee((prev) => (prev ? { ...prev, photoUrl: data.avatar } : null));
+          }
+        }
+        addToast('Perfil atualizado com sucesso!', 'success');
+        return;
+      }
+      throw err;
+    }
+  };
+
   const lockSystem = () => {
     sessionStorage.removeItem('gestao_rh_session_unlocked');
     setIsLocked(true);
@@ -297,6 +377,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         switchUser,
         loginAsEmployee,
         loginAsAdmin,
+        updateUserProfile,
         hasPermission,
         refreshUsers,
         logout,

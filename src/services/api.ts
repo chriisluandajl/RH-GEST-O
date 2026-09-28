@@ -51,10 +51,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
-  employeeLogin: (identifier: string) =>
+  employeeLogin: (identifier: string, password?: string) =>
     fetchJSON<{ token: string; user: User; employee?: any }>('/auth/employee-login', {
       method: 'POST',
-      body: JSON.stringify({ identifier }),
+      body: JSON.stringify({ identifier, password }),
+    }),
+  updateProfile: (data: {
+    id?: string;
+    name?: string;
+    email?: string;
+    avatar?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) =>
+    fetchJSON<{ success: boolean; user: User }>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
     }),
   getMe: () => fetchJSON<{ user: User }>('/auth/me'),
   getUsers: () => fetchJSON<User[]>('/auth/users'),

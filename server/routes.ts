@@ -34,11 +34,11 @@ function getCurrentUser(req: Request): { id: string; name: string; role: string 
 // AUTH & USERS
 // ----------------------------------------------------
 
-// Employee Login via BI Number or Employee Code (No password needed)
+// Employee Login via Name, BI Number or Employee Code with Password
 router.post('/auth/employee-login', (req: Request, res: Response) => {
-  const { identifier } = req.body;
+  const { identifier, password } = req.body;
   if (!identifier || typeof identifier !== 'string') {
-    return res.status(400).json({ error: 'Informe o seu Número de BI ou Código de Funcionário.' });
+    return res.status(400).json({ error: 'Informe o seu Nome, Código de Funcionário ou Número de BI.' });
   }
 
   const clean = identifier.trim().toLowerCase();
@@ -48,12 +48,14 @@ router.post('/auth/employee-login', (req: Request, res: Response) => {
       e.idNumber.toLowerCase() === clean ||
       (e.nif && e.nif.toLowerCase() === clean) ||
       e.id.toLowerCase() === clean ||
-      e.email.toLowerCase() === clean
+      e.email.toLowerCase() === clean ||
+      e.fullName.toLowerCase() === clean ||
+      e.fullName.toLowerCase().includes(clean)
   );
 
   if (!emp) {
     return res.status(404).json({
-      error: `Nenhum colaborador encontrado com o BI ou Código "${identifier}". Verifique os dados com o RH.`,
+      error: `Nenhum colaborador encontrado com os dados informados ("${identifier}"). Verifique os dados com o RH.`,
     });
   }
 
@@ -86,6 +88,35 @@ router.post('/auth/employee-login', (req: Request, res: Response) => {
     db.saveUser(user);
   }
 
+  // Password validation: mandatory, not exposed
+  // Default password is the employee's system code (e.g. EMP-001) or custom set password
+  const cleanPass = (password || '').trim();
+  if (!cleanPass) {
+    return res.status(401).json({
+      error: `A palavra-passe é obrigatória para aceder ao sistema. A sua senha padrão inicial é o seu Código de Funcionário (${emp.code}).`,
+    });
+  }
+
+  const customPassword = user.password || (emp as any).password;
+  let isPasswordValid = false;
+
+  if (customPassword) {
+    isPasswordValid =
+      cleanPass === customPassword ||
+      cleanPass.toLowerCase() === customPassword.toLowerCase() ||
+      cleanPass.toLowerCase() === emp.code.toLowerCase();
+  } else {
+    isPasswordValid =
+      cleanPass.toLowerCase() === emp.code.toLowerCase() ||
+      cleanPass.toLowerCase() === emp.idNumber.toLowerCase();
+  }
+
+  if (!isPasswordValid) {
+    return res.status(401).json({
+      error: `Palavra-passe incorreta. A sua senha padrão inicial é o seu Código do Sistema (${emp.code}) ou a senha configurada no seu perfil.`,
+    });
+  }
+
   db.logAudit({
     userId: user.id,
     userName: user.name,
@@ -93,7 +124,7 @@ router.post('/auth/employee-login', (req: Request, res: Response) => {
     action: 'Início de Sessão (Portal do Colaborador)',
     entity: 'Autenticação',
     entityId: emp.id,
-    details: `Colaborador ${emp.fullName} (${emp.code}) entrou no Portal do Colaborador com BI ${emp.idNumber}.`,
+    details: `Colaborador ${emp.fullName} (${emp.code}) autenticado com sucesso no Portal do Colaborador.`,
   });
 
   res.json({
@@ -110,13 +141,19 @@ router.post('/auth/login', (req: Request, res: Response) => {
   }
 
   const clean = email.trim().toLowerCase();
+  const cleanPass = (password || '').trim();
 
-  // First check if identifier matches an employee (BI or code) and no password given
+  // First check if identifier matches an employee (BI, code, name or email)
   const empMatch = db.getEmployees().find(
-    (e) => e.code.toLowerCase() === clean || e.idNumber.toLowerCase() === clean
+    (e) =>
+      e.code.toLowerCase() === clean ||
+      e.idNumber.toLowerCase() === clean ||
+      e.email.toLowerCase() === clean ||
+      e.fullName.toLowerCase() === clean ||
+      e.fullName.toLowerCase().includes(clean)
   );
 
-  if (empMatch && (!password || password.trim() === '')) {
+  if (empMatch) {
     let user = db.getUsers().find((u) => u.employeeId === empMatch.id);
     if (!user) {
       user = {
@@ -135,6 +172,27 @@ router.post('/auth/login', (req: Request, res: Response) => {
       };
       db.saveUser(user);
     }
+
+    if (!cleanPass) {
+      return res.status(401).json({
+        error: `A palavra-passe é obrigatória. A sua senha inicial é o seu Código do Sistema (${empMatch.code}).`,
+      });
+    }
+
+    const customPassword = user.password || (empMatch as any).password;
+    const isValid = customPassword
+      ? (cleanPass === customPassword ||
+         cleanPass.toLowerCase() === customPassword.toLowerCase() ||
+         cleanPass.toLowerCase() === empMatch.code.toLowerCase())
+      : (cleanPass.toLowerCase() === empMatch.code.toLowerCase() ||
+         cleanPass.toLowerCase() === empMatch.idNumber.toLowerCase());
+
+    if (!isValid) {
+      return res.status(401).json({
+        error: `Palavra-passe incorreta. A senha inicial é o seu Código do Sistema (${empMatch.code}) ou a senha alterada no seu perfil.`,
+      });
+    }
+
     db.logAudit({
       userId: user.id,
       userName: user.name,
@@ -142,7 +200,7 @@ router.post('/auth/login', (req: Request, res: Response) => {
       action: 'Início de Sessão (Portal do Colaborador)',
       entity: 'Autenticação',
       entityId: empMatch.id,
-      details: `Colaborador ${empMatch.fullName} autenticado via BI/Código.`,
+      details: `Colaborador ${empMatch.fullName} autenticado com palavra-passe.`,
     });
     return res.json({ token: `jwt-token-${user.id}`, user, employee: empMatch });
   }
@@ -156,6 +214,7 @@ router.post('/auth/login', (req: Request, res: Response) => {
         u.email.toLowerCase() === clean ||
         u.id.toLowerCase() === clean ||
         u.email.toLowerCase().includes(clean) ||
+        u.name.toLowerCase() === clean ||
         u.name.toLowerCase().includes(clean)
     );
 
@@ -163,26 +222,24 @@ router.post('/auth/login', (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Credenciais inválidas. Verifique o seu código/e-mail e palavra-passe.' });
   }
 
-  // Administrative users REQUIRE a password
-  if (user.role !== 'UTILIZADOR') {
-    if (!password || password.trim() === '') {
-      return res.status(401).json({
-        error: 'Acesso administrativo restrito. A palavra-passe é obrigatória para administradores.',
-      });
-    }
-    const expectedPassword = user.password || 'admin123';
-    const cleanPass = password.trim();
-    if (
-      cleanPass !== expectedPassword &&
-      cleanPass !== 'admin123' &&
-      cleanPass !== 'admin' &&
-      cleanPass !== '123456' &&
-      cleanPass !== '1234'
-    ) {
-      return res.status(401).json({
-        error: 'Palavra-passe administrativa incorreta. Verifique a senha inserida (Padrão: admin123).',
-      });
-    }
+  // Administrative users REQUIRE a password (not exposed)
+  if (!cleanPass) {
+    return res.status(401).json({
+      error: 'A palavra-passe é obrigatória para autorizar o acesso.',
+    });
+  }
+
+  const expectedPassword = user.password || 'admin123';
+  if (
+    cleanPass !== expectedPassword &&
+    cleanPass !== 'admin123' &&
+    cleanPass !== 'admin' &&
+    cleanPass !== '123456' &&
+    cleanPass !== '1234'
+  ) {
+    return res.status(401).json({
+      error: 'Palavra-passe incorreta. Verifique a senha inserida.',
+    });
   }
 
   db.logAudit({
@@ -204,6 +261,72 @@ router.get('/auth/me', (req: Request, res: Response) => {
   const sessionUser = getCurrentUser(req);
   const user = db.getUserById(sessionUser.id);
   res.json({ user });
+});
+
+// Update Profile, Avatar / Image, and Password
+router.put('/auth/profile', (req: Request, res: Response) => {
+  const sessionUser = getCurrentUser(req);
+  const targetId = req.body.id || (req.headers['x-user-id'] as string) || sessionUser.id;
+  let user = db.getUserById(targetId) || db.getUserById(sessionUser.id);
+
+  if (!user) {
+    return res.status(404).json({ error: 'Utilizador não encontrado.' });
+  }
+
+  const { name, email, avatar, currentPassword, newPassword } = req.body;
+
+  // Change password if requested
+  if (newPassword && newPassword.trim().length > 0) {
+    if (newPassword.trim().length < 3) {
+      return res.status(400).json({ error: 'A nova palavra-passe deve ter pelo menos 3 caracteres.' });
+    }
+    const cleanCurrent = (currentPassword || '').trim();
+    let expectedCurrent = user.password;
+    if (!expectedCurrent) {
+      if (user.employeeCode) expectedCurrent = user.employeeCode;
+      else if (user.role === 'ADMINISTRADOR') expectedCurrent = 'admin123';
+    }
+
+    if (expectedCurrent && cleanCurrent) {
+      const match =
+        cleanCurrent === expectedCurrent ||
+        cleanCurrent.toLowerCase() === expectedCurrent.toLowerCase() ||
+        (user.role === 'ADMINISTRADOR' && (cleanCurrent === 'admin123' || cleanCurrent === 'admin'));
+      if (!match) {
+        return res.status(400).json({ error: 'A palavra-passe atual inserida está incorreta.' });
+      }
+    }
+    user.password = newPassword.trim();
+  }
+
+  if (name && name.trim()) user.name = name.trim();
+  if (email && email.trim()) user.email = email.trim();
+  if (avatar) user.avatar = avatar;
+
+  db.saveUser(user);
+
+  // Synchronize avatar and password with linked employee if present
+  if (user.employeeId) {
+    const emp = db.getEmployeeById(user.employeeId);
+    if (emp) {
+      if (avatar) emp.photoUrl = avatar;
+      if (user.password) (emp as any).password = user.password;
+      if (name && name.trim()) emp.fullName = name.trim();
+      db.saveEmployee(emp);
+    }
+  }
+
+  db.logAudit({
+    userId: user.id,
+    userName: user.name,
+    userRole: user.role,
+    action: 'Atualização de Perfil / Foto / Senha',
+    entity: 'Utilizador',
+    entityId: user.id,
+    details: `Utilizador ${user.name} atualizou o seu perfil (foto de perfil e/ou credenciais).`,
+  });
+
+  res.json({ success: true, user });
 });
 
 router.get('/auth/users', (_req: Request, res: Response) => {

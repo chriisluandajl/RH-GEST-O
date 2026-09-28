@@ -15,12 +15,16 @@ import {
   Lock,
   LogOut,
   KeyRound,
+  Camera,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { useCompany } from '../../context/CompanyContext.tsx';
 import { api } from '../../services/api.ts';
 import { NotificationItem } from '../../types/index.ts';
 import { CompanyLogo } from './CompanyLogo.tsx';
+import { ProfileModal } from './ProfileModal.tsx';
+import { CompanyLogoModal } from './CompanyLogoModal.tsx';
 
 interface HeaderProps {
   onOpenSearch: () => void;
@@ -74,6 +78,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showQuickDropdown, setShowQuickDropdown] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isCompanyLogoModalOpen, setIsCompanyLogoModalOpen] = useState(false);
 
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
@@ -409,13 +415,37 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="p-2 space-y-1 border-b border-slate-100">
                 <button
                   onClick={() => {
+                    setIsProfileModalOpen(true);
+                    setShowUserDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 bg-blue-50 hover:bg-blue-100/80 text-blue-800 font-semibold rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Meu Perfil (Trocar Foto & Senha)</span>
+                </button>
+
+                {!isEmployeeOnly && (
+                  <button
+                    onClick={() => {
+                      setIsCompanyLogoModalOpen(true);
+                      setShowUserDropdown(false);
+                    }}
+                    className="w-full text-left px-3 py-2 bg-indigo-50/70 hover:bg-indigo-100/80 text-indigo-900 font-semibold rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Alterar Imagem da Empresa</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
                     openLoginModal();
                     setShowUserDropdown(false);
                   }}
-                  className="w-full text-left px-3 py-2 bg-blue-50 hover:bg-blue-100/80 text-blue-800 font-semibold rounded-lg flex items-center gap-2 transition-colors"
+                  className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-100 font-medium rounded-lg flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <KeyRound className="w-3.5 h-3.5 text-blue-600" />
-                  Entrar com Outro BI / Senha
+                  <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Trocar Sessão / Autenticar</span>
                 </button>
               </div>
 
@@ -476,6 +506,18 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </div>
+
+      {/* Profile & Password Edit Modal */}
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      {/* Company Image & Logo Edit Modal */}
+      <CompanyLogoModal
+        isOpen={isCompanyLogoModalOpen}
+        onClose={() => setIsCompanyLogoModalOpen(false)}
+      />
     </header>
   );
 };

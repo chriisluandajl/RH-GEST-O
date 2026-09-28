@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Building2,
   Users,
@@ -25,6 +25,8 @@ import {
   UploadCloud,
   RefreshCw,
   Laptop,
+  Upload,
+  Camera,
 } from 'lucide-react';
 import { useCompany } from '../../context/CompanyContext.tsx';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -106,6 +108,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSubModule }) 
   const [isLoadingServerInfo, setIsLoadingServerInfo] = useState(false);
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
+
+  const compLogoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      addToast('Por favor, selecione um ficheiro de imagem válido (JPG, PNG, WEBP).', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const dataUrl = uploadEvent.target?.result as string;
+      if (dataUrl) {
+        setCompForm((prev) => ({ ...prev, logoUrl: dataUrl }));
+        addToast('Novo logótipo carregado! Clique em "Guardar Alterações" para aplicar.', 'info');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const fetchServerInfo = async () => {
     try {
@@ -373,11 +395,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSubModule }) 
             </div>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Save className="w-4 h-4" />
               Guardar Alterações
             </button>
+          </div>
+
+          {/* Logótipo & Imagem da Empresa */}
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex flex-col md:flex-row items-center gap-5">
+            <div className="w-24 h-24 rounded-2xl bg-white border border-slate-300 shadow-xs flex items-center justify-center p-2 shrink-0 overflow-hidden">
+              <img
+                src={compForm.logoUrl || '/company_logo.jpg'}
+                alt="Logótipo da Empresa"
+                className="max-w-full max-h-full object-contain"
+                onError={(e) => {
+                  (e.target as any).src = '/company_logo.jpg';
+                }}
+              />
+            </div>
+
+            <div className="flex-1 space-y-2 text-center md:text-left">
+              <div>
+                <h3 className="font-bold text-slate-900 text-xs flex items-center justify-center md:justify-start gap-1.5">
+                  <Building2 className="w-4 h-4 text-blue-600" />
+                  Logótipo & Imagem Institucional da Empresa
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Apresentado no cabeçalho do sistema, em todos os contratos impressos, recibos de vencimento e relatórios em PDF.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 pt-1">
+                <input
+                  ref={compLogoInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => compLogoInputRef.current?.click()}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer text-xs"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Carregar Nova Imagem
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = prompt('Cole o endereço / link da imagem do logótipo:', compForm.logoUrl || '');
+                    if (url !== null && url.trim()) {
+                      setCompForm((prev) => ({ ...prev, logoUrl: url.trim() }));
+                      addToast('Endereço do logótipo aplicado. Guarde para confirmar.', 'info');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg border border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer text-xs"
+                >
+                  <Camera className="w-3.5 h-3.5 text-slate-500" />
+                  Inserir Link da Imagem
+                </button>
+
+                {compForm.logoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompForm((prev) => ({ ...prev, logoUrl: '/company_logo.jpg' }));
+                      addToast('Logótipo reposto para o padrão.', 'info');
+                    }}
+                    className="px-2.5 py-1.5 text-slate-500 hover:text-slate-800 text-xs font-medium cursor-pointer"
+                  >
+                    Repor Padrão
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

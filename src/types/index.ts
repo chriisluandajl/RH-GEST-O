@@ -116,6 +116,7 @@ export interface Employee {
   emergencyContactPhone: string;
   emergencyContactAddress?: string;
 
+  password?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;
