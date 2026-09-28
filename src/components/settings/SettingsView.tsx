@@ -27,6 +27,7 @@ import {
   Laptop,
   Upload,
   Camera,
+  ExternalLink,
 } from 'lucide-react';
 import { useCompany } from '../../context/CompanyContext.tsx';
 import { useAuth } from '../../context/AuthContext.tsx';
@@ -912,24 +913,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ initialSubModule }) 
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Banco de dados na nuvem ativo. Permite hospedar no Render, Koyeb ou executar localmente sem nunca perder dados.
+                      Banco de dados na nuvem da Google ativo. Permite sincronização mundial e armazenamento permanente.
                     </p>
                   </div>
                 </div>
+
+                <a
+                  href="https://console.firebase.google.com/project/nodal-scheduler-xlxdt/firestore"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors flex items-center gap-1.5 text-xs self-start sm:self-auto shrink-0 shadow-xs"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Abrir no Firebase Console
+                </a>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
                 <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
                   <span className="text-slate-400 font-semibold block text-[10px] uppercase">Projeto Firebase</span>
-                  <code className="text-amber-900 font-mono font-bold text-xs mt-0.5 block">nodal-scheduler-xlxdt</code>
+                  <code className="text-amber-900 font-mono font-bold text-xs mt-0.5 block truncate">
+                    nodal-scheduler-xlxdt
+                  </code>
+                </div>
+                <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
+                  <span className="text-slate-400 font-semibold block text-[10px] uppercase">Base de Dados Firestore</span>
+                  <code className="text-amber-900 font-mono font-bold text-xs mt-0.5 block truncate" title="ai-studio-gestoempresarial-e5e3a4b5-a152-4717-a441-fa349ff8a546">
+                    ai-studio-gestoempresarial...
+                  </code>
                 </div>
                 <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200/60">
                   <span className="text-slate-400 font-semibold block text-[10px] uppercase">Regras de Segurança ABAC</span>
                   <span className="text-emerald-700 font-bold text-xs mt-0.5 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    Regras implantadas e ativas no Google Cloud
+                    Ativas no Google Cloud
                   </span>
                 </div>
+              </div>
+
+              <div className="p-3 bg-amber-100/60 border border-amber-200/70 rounded-xl text-[11px] text-amber-950 space-y-1">
+                <span className="font-bold block">💡 Dica para ver a sincronização dentro do Firebase Console:</span>
+                <p className="text-amber-900 leading-relaxed">
+                  1. Abra <strong>Firestore Database</strong> no console do Firebase.<br />
+                  2. No topo da página, clique no seletor de base de dados e selecione <strong>ai-studio-gestoempresarial-e5e3a4b5-a152-4717-a441-fa349ff8a546</strong> (em vez de default).<br />
+                  3. Na aba <strong>Dados</strong> você verá as coleções em tempo real e na aba <strong>Utilização (Usage)</strong> verá o gráfico de leituras e gravações.
+                </p>
               </div>
             </div>
           </div>

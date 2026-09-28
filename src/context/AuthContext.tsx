@@ -95,16 +95,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setRoles(rolesData);
       setEmployeesList(empData);
 
-      const savedUserId = localStorage.getItem('gestao_rh_user_id') || usersData[0]?.id;
-      const found = usersData.find((u) => u.id === savedUserId) || usersData[0] || null;
-      setUser(found);
-      if (found) {
-        localStorage.setItem('gestao_rh_user_id', found.id);
-        if (found.employeeId) {
-          const emp = empData.find((e) => e.id === found.employeeId);
-          setCurrentEmployee(emp || null);
+      // Preserve active session if user has already logged in
+      setUser((currentActiveUser) => {
+        if (currentActiveUser) {
+          if (currentActiveUser.isEmployeeOnly || currentActiveUser.role === 'UTILIZADOR') {
+            const matchingEmp = empData.find(
+              (e) =>
+                e.id === currentActiveUser.employeeId ||
+                e.code.toLowerCase() === (currentActiveUser.employeeCode || '').toLowerCase()
+            );
+            if (matchingEmp) {
+              setCurrentEmployee(matchingEmp);
+            }
+            return {
+              ...currentActiveUser,
+              role: 'UTILIZADOR',
+              isEmployeeOnly: true,
+            };
+          }
+          const matchingAdmin = usersData.find((u) => u.id === currentActiveUser.id);
+          return matchingAdmin ? { ...currentActiveUser, ...matchingAdmin } : currentActiveUser;
         }
-      }
+
+        const savedUserId = localStorage.getItem('gestao_rh_user_id');
+        let found: User | null = null;
+        if (savedUserId) {
+          found = usersData.find((u) => u.id === savedUserId) || null;
+          if (!found) {
+            const cleanEmpId = savedUserId.replace('usr-emp-', '');
+            const emp = empData.find(
+              (e) =>
+                e.id === cleanEmpId ||
+                e.id === savedUserId ||
+                e.code.toLowerCase() === cleanEmpId.toLowerCase()
+            );
+            if (emp) {
+              found = usersData.find(
+                (u) =>
+                  u.employeeId === emp.id ||
+                  (u.code && u.code.toLowerCase() === emp.code.toLowerCase())
+              ) || {
+                id: `usr-emp-${emp.id.replace(/^emp-/, '')}`,
+                code: emp.code,
+                name: emp.fullName,
+                email: emp.email,
+                role: 'UTILIZADOR',
+                avatar: emp.photoUrl,
+                departmentId: emp.departmentId,
+                employeeId: emp.id,
+                employeeCode: emp.code,
+                biNumber: emp.idNumber,
+                isEmployeeOnly: true,
+                active: true,
+                createdAt: emp.createdAt || new Date().toISOString(),
+              };
+              if (!usersData.some((u) => u.id === found!.id)) {
+                usersData.push(found);
+                setUsers([...usersData]);
+              }
+            }
+          }
+        }
+
+        if (!found) {
+          found = usersData[0] || null;
+        }
+
+        if (found) {
+          localStorage.setItem('gestao_rh_user_id', found.id);
+          if (found.employeeId) {
+            const emp = empData.find((e) => e.id === found.employeeId);
+            setCurrentEmployee(emp || null);
+          } else {
+            setCurrentEmployee(null);
+          }
+        }
+        return found;
+      });
       setLoading(false);
     }
   };
@@ -136,16 +203,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await api.employeeLogin(identifier, password);
       if (res.user) {
-        setUser(res.user);
-        localStorage.setItem('gestao_rh_user_id', res.user.id);
-        sessionStorage.setItem('gestao_rh_session_unlocked', 'true');
-        setIsLocked(false);
-        setIsLoginModalOpen(false);
+        const activeUser: User = {
+          ...res.user,
+          role: 'UTILIZADOR',
+          isEmployeeOnly: true,
+        };
+        setUser(activeUser);
         if (res.employee) {
           setCurrentEmployee(res.employee);
         }
-        addToast(`Acesso desbloqueado: ${res.user.name} (Portal do Colaborador)`, 'success');
-        refreshUsers();
+        localStorage.setItem('gestao_rh_user_id', activeUser.id);
+        localStorage.setItem('gestao_rh_user_role', 'UTILIZADOR');
+        sessionStorage.setItem('gestao_rh_session_unlocked', 'true');
+        setIsLocked(false);
+        setIsLoginModalOpen(false);
+
+        // Keep local users state in sync without re-triggering a reload
+        setUsers((prev) => {
+          const idx = prev.findIndex((u) => u.id === activeUser.id);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = activeUser;
+            return next;
+          }
+          return [...prev, activeUser];
+        });
+
+        addToast(`Acesso desbloqueado: ${activeUser.name} (Portal do Colaborador)`, 'success');
         return;
       }
     } catch (err: any) {
@@ -168,7 +252,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         const fallbackUser: User = {
-          id: `usr-emp-${emp.id}`,
+          id: `usr-emp-${emp.id.replace(/^emp-/, '')}`,
+          code: emp.code,
           name: emp.fullName,
           email: emp.email,
           role: 'UTILIZADOR',
@@ -182,26 +267,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: new Date().toISOString(),
         };
 
-        const existingUser = users.find((u) => u.employeeId === emp.id || u.email.toLowerCase() === emp.email.toLowerCase());
-        const expected = existingUser?.password || emp.password;
+        const existingUser = users.find(
+          (u) =>
+            u.employeeId === emp.id ||
+            (u.code && u.code.toLowerCase() === emp.code.toLowerCase()) ||
+            u.email.toLowerCase() === emp.email.toLowerCase()
+        );
+        const expected = existingUser?.password || (emp as any).password;
         let valid = false;
         if (expected) {
-          valid = cleanPass === expected || cleanPass.toLowerCase() === expected.toLowerCase() || cleanPass.toLowerCase() === emp.code.toLowerCase();
+          valid =
+            cleanPass === expected ||
+            cleanPass.toLowerCase() === expected.toLowerCase() ||
+            cleanPass.toLowerCase() === emp.code.toLowerCase();
         } else {
-          valid = cleanPass.toLowerCase() === emp.code.toLowerCase() || cleanPass.toLowerCase() === emp.idNumber.toLowerCase();
+          valid =
+            cleanPass.toLowerCase() === emp.code.toLowerCase() ||
+            cleanPass.toLowerCase() === emp.idNumber.toLowerCase();
         }
 
         if (!valid) {
-          throw new Error(`Palavra-passe incorreta. A sua senha inicial é o seu Código do Sistema (${emp.code}) ou a senha alterada no seu perfil.`);
+          throw new Error(
+            `Palavra-passe incorreta. A sua senha inicial é o seu Código do Sistema (${emp.code}) ou a senha alterada no seu perfil.`
+          );
         }
 
-        const activeUser = existingUser || fallbackUser;
+        const activeUser: User = {
+          ...(existingUser || fallbackUser),
+          role: 'UTILIZADOR',
+          isEmployeeOnly: true,
+          employeeId: emp.id,
+          employeeCode: emp.code,
+        };
+
         setUser(activeUser);
         setCurrentEmployee(emp);
         localStorage.setItem('gestao_rh_user_id', activeUser.id);
+        localStorage.setItem('gestao_rh_user_role', 'UTILIZADOR');
         sessionStorage.setItem('gestao_rh_session_unlocked', 'true');
         setIsLocked(false);
         setIsLoginModalOpen(false);
+
+        setUsers((prev) => {
+          const idx = prev.findIndex((u) => u.id === activeUser.id);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = activeUser;
+            return next;
+          }
+          return [...prev, activeUser];
+        });
+
         addToast(`Acesso desbloqueado: ${emp.fullName} (Portal do Colaborador)`, 'success');
         return;
       }
@@ -214,12 +330,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.login(emailOrCode, password);
       if (res.user) {
         setUser(res.user);
+        setCurrentEmployee(null);
         localStorage.setItem('gestao_rh_user_id', res.user.id);
         sessionStorage.setItem('gestao_rh_session_unlocked', 'true');
         setIsLocked(false);
         setIsLoginModalOpen(false);
+
+        setUsers((prev) => {
+          const idx = prev.findIndex((u) => u.id === res.user.id);
+          if (idx !== -1) {
+            const next = [...prev];
+            next[idx] = res.user;
+            return next;
+          }
+          return [...prev, res.user];
+        });
+
         addToast(`Sessão administrativa autorizada: ${res.user.name} (${res.user.role})`, 'success');
-        refreshUsers();
         return;
       }
     } catch (err: any) {
@@ -249,6 +376,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           cleanPass === '1234'
         ) {
           setUser(targetUser);
+          setCurrentEmployee(null);
           localStorage.setItem('gestao_rh_user_id', targetUser.id);
           sessionStorage.setItem('gestao_rh_session_unlocked', 'true');
           setIsLocked(false);
@@ -264,7 +392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isEmployeeOnly = Boolean(
-    user?.role === 'UTILIZADOR' || user?.isEmployeeOnly || user?.employeeId
+    user?.role === 'UTILIZADOR' || user?.isEmployeeOnly
   );
 
   const hasPermission = (permission: keyof RolePermissions['permissions'] | string): boolean => {
@@ -281,9 +409,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const [usersData, emps] = await Promise.all([api.getUsers(), api.getEmployees()]);
       setUsers(usersData);
       setEmployeesList(emps || []);
-      if (user) {
-        const updated = usersData.find((u) => u.id === user.id);
-        if (updated) setUser(updated);
+      const currentStoredId = localStorage.getItem('gestao_rh_user_id');
+      if (currentStoredId) {
+        setUser((prev) => {
+          if (!prev) return null;
+          const targetId = currentStoredId || prev.id;
+          const updated = usersData.find(
+            (u) =>
+              u.id === targetId ||
+              (prev.employeeId && u.employeeId === prev.employeeId) ||
+              (prev.employeeCode && (u.employeeCode === prev.employeeCode || u.code === prev.employeeCode))
+          );
+          if (updated) {
+            if (prev.isEmployeeOnly || prev.role === 'UTILIZADOR') {
+              return { ...prev, ...updated, role: 'UTILIZADOR', isEmployeeOnly: true };
+            }
+            return { ...prev, ...updated };
+          }
+          return prev;
+        });
       }
     } catch (err) {
       console.error(err);

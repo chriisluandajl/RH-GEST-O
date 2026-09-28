@@ -61,12 +61,20 @@ router.post('/auth/employee-login', (req: Request, res: Response) => {
 
   // Find or create linked user session
   let user = db.getUsers().find(
-    (u) => u.employeeId === emp.id || u.email.toLowerCase() === emp.email.toLowerCase()
+    (u) =>
+      u.employeeId === emp.id ||
+      (u.employeeCode && u.employeeCode.toLowerCase() === emp.code.toLowerCase()) ||
+      (u.code && u.code.toLowerCase() === emp.code.toLowerCase()) ||
+      (u.email && u.email.toLowerCase() === emp.email.toLowerCase())
   );
+
+  const cleanEmpId = emp.id.replace(/^emp-/, '');
+  const canonicalUserId = `usr-emp-${cleanEmpId}`;
 
   if (!user) {
     user = {
-      id: `usr-emp-${emp.id}`,
+      id: canonicalUserId,
+      code: emp.code,
       name: emp.fullName,
       email: emp.email,
       role: 'UTILIZADOR',
@@ -84,7 +92,8 @@ router.post('/auth/employee-login', (req: Request, res: Response) => {
     user.employeeId = emp.id;
     user.employeeCode = emp.code;
     user.biNumber = emp.idNumber;
-    user.isEmployeeOnly = user.role === 'UTILIZADOR';
+    user.role = 'UTILIZADOR';
+    user.isEmployeeOnly = true;
     db.saveUser(user);
   }
 
@@ -154,10 +163,20 @@ router.post('/auth/login', (req: Request, res: Response) => {
   );
 
   if (empMatch) {
-    let user = db.getUsers().find((u) => u.employeeId === empMatch.id);
+    let user = db.getUsers().find(
+      (u) =>
+        u.employeeId === empMatch.id ||
+        (u.employeeCode && u.employeeCode.toLowerCase() === empMatch.code.toLowerCase()) ||
+        (u.code && u.code.toLowerCase() === empMatch.code.toLowerCase()) ||
+        (u.email && u.email.toLowerCase() === empMatch.email.toLowerCase())
+    );
+    const cleanEmpId = empMatch.id.replace(/^emp-/, '');
+    const canonicalUserId = `usr-emp-${cleanEmpId}`;
+
     if (!user) {
       user = {
-        id: `usr-emp-${empMatch.id}`,
+        id: canonicalUserId,
+        code: empMatch.code,
         name: empMatch.fullName,
         email: empMatch.email,
         role: 'UTILIZADOR',
@@ -170,6 +189,13 @@ router.post('/auth/login', (req: Request, res: Response) => {
         active: true,
         createdAt: new Date().toISOString(),
       };
+      db.saveUser(user);
+    } else {
+      user.employeeId = empMatch.id;
+      user.employeeCode = empMatch.code;
+      user.biNumber = empMatch.idNumber;
+      user.role = 'UTILIZADOR';
+      user.isEmployeeOnly = true;
       db.saveUser(user);
     }
 

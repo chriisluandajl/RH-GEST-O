@@ -97,7 +97,7 @@ class EnterpriseDatabase {
       try {
         const fileContent = fs.readFileSync(sourceFile, 'utf-8');
         const parsed = JSON.parse(fileContent);
-        return {
+        const data: DatabaseSchema = {
           companySettings: parsed.companySettings || initialCompanySettings,
           visualSettings: parsed.visualSettings || initialVisualSettings,
           roles: parsed.roles || initialRoles,
@@ -115,6 +115,31 @@ class EnterpriseDatabase {
           notifications: parsed.notifications || initialNotifications,
           auditLogs: parsed.auditLogs || initialAuditLogs,
         };
+
+        // Ensure every employee has an active user account in users
+        const existingEmpIds = new Set(data.users.map((u) => u.employeeId).filter(Boolean));
+        data.employees.forEach((emp) => {
+          if (!existingEmpIds.has(emp.id)) {
+            data.users.push({
+              id: `usr-emp-${emp.id}`,
+              code: emp.code,
+              name: emp.fullName,
+              email: emp.email,
+              role: 'UTILIZADOR',
+              password: (emp as any).password || emp.code,
+              avatar: emp.photoUrl,
+              departmentId: emp.departmentId,
+              employeeId: emp.id,
+              employeeCode: emp.code,
+              biNumber: emp.idNumber,
+              isEmployeeOnly: true,
+              active: true,
+              createdAt: emp.createdAt || new Date().toISOString(),
+            });
+          }
+        });
+
+        return data;
       } catch (err) {
         console.error('Error loading database file, initializing with defaults', err);
       }
