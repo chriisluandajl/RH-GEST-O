@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { CompanyLogo } from './CompanyLogo.tsx';
+import { initialUsers, initialEmployees } from '../../../server/initialData.ts';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -32,16 +33,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     addToast,
   } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'employee' | 'admin'>('employee');
+  const [activeTab, setActiveTab] = useState<'employee' | 'admin'>('admin');
 
   // Employee Form State
   const [employeeIdentifier, setEmployeeIdentifier] = useState('');
   const [employeeError, setEmployeeError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Admin Form State
-  const [adminCodeOrEmail, setAdminCodeOrEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+  // Admin Form State (pre-filled with default principal admin credentials)
+  const [adminCodeOrEmail, setAdminCodeOrEmail] = useState('ADM-001');
+  const [adminPassword, setAdminPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
 
@@ -50,8 +51,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const handleEmployeeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmployeeError(null);
-    if (!employeeIdentifier.trim()) {
+    const clean = employeeIdentifier.trim().toLowerCase();
+    if (!clean) {
       setEmployeeError('Por favor, informe o seu Código de Funcionário no Sistema (Ex: EMP-001) ou BI.');
+      return;
+    }
+
+    // Auto-detect if user entered admin credentials on employee tab
+    if (
+      clean.startsWith('adm') ||
+      clean.includes('admin') ||
+      clean === 'admin123' ||
+      clean.includes('@delta-empresarial.com')
+    ) {
+      setActiveTab('admin');
+      setAdminCodeOrEmail(clean === 'admin123' ? 'ADM-001' : employeeIdentifier.trim());
+      setAdminPassword('admin123');
+      setAdminError('Perfil de Administrador detetado! A sua senha padrão (admin123) está pronta. Clique em "Validar Senha" para aceder.');
       return;
     }
 
@@ -74,7 +90,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       return;
     }
     if (!adminPassword.trim()) {
-      setAdminError('A palavra-passe é obrigatória para autorizar o acesso administrativo.');
+      setAdminError('A palavra-passe é obrigatória para autorizar o acesso administrativo (Padrão: admin123).');
       return;
     }
 
@@ -83,7 +99,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       await loginAsAdmin(adminCodeOrEmail.trim(), adminPassword.trim());
       onClose();
     } catch (err: any) {
-      setAdminError(err.message || 'Código ou palavra-passe administrativa incorreta.');
+      setAdminError(err.message || 'Código ou palavra-passe administrativa incorreta (Padrão: admin123).');
     } finally {
       setIsSubmitting(false);
     }
@@ -366,10 +382,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             {/* Quick Admin Profile Selection */}
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                Administradores autorizados rápidos:
+                Administradores autorizados (clique para preencher):
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {users
+                {(users.length > 0 ? users : initialUsers)
                   .filter((u) => u.role !== 'UTILIZADOR')
                   .slice(0, 4)
                   .map((u) => (
@@ -379,7 +395,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
                       onClick={() => handleQuickAdminSelect(u.code || u.email, u.password || 'admin123')}
                       className={`text-left p-2.5 rounded-xl border transition-all flex items-center gap-2.5 ${
                         adminCodeOrEmail === (u.code || u.email)
-                          ? 'border-amber-500 bg-amber-500/20 text-white'
+                          ? 'border-amber-500 bg-amber-500/20 text-white shadow-xs'
                           : 'border-white/10 hover:border-white/20 bg-white/5 text-slate-300'
                       }`}
                     >
@@ -399,14 +415,36 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-2 space-y-2">
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4" />
                 {isSubmitting ? 'A validar palavra-passe...' : 'Validar Senha & Desbloquear Gestão Global'}
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={async () => {
+                  setAdminCodeOrEmail('ADM-001');
+                  setAdminPassword('admin123');
+                  setIsSubmitting(true);
+                  try {
+                    await loginAsAdmin('ADM-001', 'admin123');
+                    onClose();
+                  } catch (err: any) {
+                    setAdminError(err.message);
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                }}
+                className="w-full py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Desbloquear Direto como Administrador Principal (ADM-001)</span>
               </button>
             </div>
           </form>

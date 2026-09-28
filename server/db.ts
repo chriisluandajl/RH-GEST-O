@@ -56,8 +56,11 @@ interface DatabaseSchema {
   auditLogs: AuditLog[];
 }
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const isVercel = process.env.VERCEL === '1' || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+const BASE_DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = isVercel ? path.join('/tmp', 'data') : BASE_DATA_DIR;
 const DB_FILE = path.join(DATA_DIR, 'database.json');
+const SEED_DB_FILE = path.join(BASE_DATA_DIR, 'database.json');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 
 class EnterpriseDatabase {
@@ -72,18 +75,27 @@ class EnterpriseDatabase {
   }
 
   private ensureDirectories() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(UPLOADS_DIR)) {
-      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(UPLOADS_DIR)) {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+      }
+    } catch (err) {
+      console.warn('Could not create directories:', err);
     }
   }
 
   private loadDatabase(): DatabaseSchema {
-    if (fs.existsSync(DB_FILE)) {
+    let sourceFile = DB_FILE;
+    if (!fs.existsSync(DB_FILE) && fs.existsSync(SEED_DB_FILE)) {
+      sourceFile = SEED_DB_FILE;
+    }
+
+    if (fs.existsSync(sourceFile)) {
       try {
-        const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
+        const fileContent = fs.readFileSync(sourceFile, 'utf-8');
         const parsed = JSON.parse(fileContent);
         return {
           companySettings: parsed.companySettings || initialCompanySettings,
