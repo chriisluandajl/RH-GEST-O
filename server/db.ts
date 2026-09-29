@@ -170,7 +170,15 @@ class EnterpriseDatabase {
   private persist(dataToSave?: DatabaseSchema) {
     try {
       this.ensureDirectories();
-      fs.writeFileSync(DB_FILE, JSON.stringify(dataToSave || this.data, null, 2), 'utf-8');
+      const content = JSON.stringify(dataToSave || this.data, null, 2);
+      fs.writeFileSync(DB_FILE, content, 'utf-8');
+      if (DB_FILE !== SEED_DB_FILE) {
+        try {
+          fs.writeFileSync(SEED_DB_FILE, content, 'utf-8');
+        } catch {
+          // ignore if read-only
+        }
+      }
     } catch (err) {
       console.error('Failed to write database file', err);
     }

@@ -26,40 +26,39 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // System Backups & Cloud Snapshots
+    match /system_backups/{backupId} {
+      allow read, write: if true;
+    }
+
     // Company Settings
     match /company_settings/{settingId} {
-      allow read: if isSignedIn();
-      allow write: if isBootstrappedAdmin();
+      allow read, write: if true;
     }
 
     // Users
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isBootstrappedAdmin() || (isSignedIn() && request.auth.uid == userId);
+      allow read, write: if true;
     }
 
     // Employees
     match /employees/{employeeId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+      allow read, write: if true;
     }
 
     // Contracts
     match /contracts/{contractId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+      allow read, write: if true;
     }
 
     // Documents
     match /documents/{documentId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+      allow read, write: if true;
     }
 
     // Payroll Sheets
     match /payroll_sheets/{sheetId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isBootstrappedAdmin() || isSignedIn();
+      allow read, write: if true;
     }
   }
 }

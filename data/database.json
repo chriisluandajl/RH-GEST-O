@@ -1,6 +1,6 @@
 {
   "companySettings": {
-    "companyName": "GESTÃO EMPRESARIAL RH",
+    "companyName": "TESTE EMPRESA NOVA",
     "commercialName": "Grupo Empresarial Delta & Associados, Lda.",
     "nif": "5412984102",
     "address": "Avenida 4 de Fevereiro, Edifício Atlântico Tower, 8º Andar",
@@ -314,6 +314,70 @@
       "isEmployeeOnly": true,
       "active": true,
       "createdAt": "2026-09-28T12:13:18.602Z"
+    },
+    {
+      "id": "usr-emp-emp-3",
+      "code": "EMP-003",
+      "name": "Joaquim Alberto Quaresma",
+      "email": "joaquim.quaresma@delta-empresarial.com",
+      "role": "UTILIZADOR",
+      "password": "EMP-003",
+      "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80",
+      "departmentId": "dep-2",
+      "employeeId": "emp-3",
+      "employeeCode": "EMP-003",
+      "biNumber": "001928491LA015",
+      "isEmployeeOnly": true,
+      "active": true,
+      "createdAt": "2020-01-10T08:30:00Z"
+    },
+    {
+      "id": "usr-emp-emp-4",
+      "code": "EMP-004",
+      "name": "Zacarias Francisco Gouveia",
+      "email": "zacarias.gouveia@delta-empresarial.com",
+      "role": "UTILIZADOR",
+      "password": "EMP-004",
+      "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80",
+      "departmentId": "dep-5",
+      "employeeId": "emp-4",
+      "employeeCode": "EMP-004",
+      "biNumber": "008912349LA058",
+      "isEmployeeOnly": true,
+      "active": true,
+      "createdAt": "2023-08-01T10:00:00Z"
+    },
+    {
+      "id": "usr-emp-emp-5",
+      "code": "EMP-005",
+      "name": "Helena Maria de Carvalho",
+      "email": "helena.carvalho@delta-empresarial.com",
+      "role": "UTILIZADOR",
+      "password": "EMP-005",
+      "avatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80",
+      "departmentId": "dep-4",
+      "employeeId": "emp-5",
+      "employeeCode": "EMP-005",
+      "biNumber": "004128930LA022",
+      "isEmployeeOnly": true,
+      "active": true,
+      "createdAt": "2022-02-01T08:00:00Z"
+    },
+    {
+      "id": "usr-emp-emp-6",
+      "code": "EMP-006",
+      "name": "Feliciano Pedro Ndongala",
+      "email": "feliciano.ndongala@delta-empresarial.com",
+      "role": "UTILIZADOR",
+      "password": "EMP-006",
+      "avatar": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&auto=format&fit=crop&q=80",
+      "departmentId": "dep-3",
+      "employeeId": "emp-6",
+      "employeeCode": "EMP-006",
+      "biNumber": "009823412LA071",
+      "isEmployeeOnly": true,
+      "active": true,
+      "createdAt": "2024-04-01T09:00:00Z"
     }
   ],
   "departments": [
@@ -1539,6 +1603,16 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1790673512358-907",
+      "userId": "usr-1",
+      "userName": "Carlos Alberto Ferreira",
+      "userRole": "ADMINISTRADOR",
+      "action": "Atualização de Dados da Empresa",
+      "entity": "Configuração",
+      "details": "Atualizados dados cadastrais e institucionais da empresa.",
+      "timestamp": "2026-09-29T09:18:32.358Z"
+    },
     {
       "id": "log-1790597598602-971",
       "userId": "usr-emp-emp-2",
